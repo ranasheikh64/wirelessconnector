@@ -42,7 +42,7 @@
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       text-align: center; padding: 120px 24px 80px; overflow: hidden;
     }
-    .hero-bg { position:absolute; inset:0; background-image:url('assets/sky_bg.png'); background-size:cover; background-position:center; opacity:.35; }
+    .hero-bg { position:absolute; inset:0; background-image:url('images/sky_bg.png'); background-size:cover; background-position:center; opacity:.35; }
     .hero-gradient { position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,42,110,.1) 0%,rgba(21,101,192,.4) 50%,rgba(10,42,110,.95) 100%); }
     .hero-stars {
       position:absolute; inset:0;
@@ -151,12 +151,7 @@
 <!-- NAVBAR -->
 <nav>
   <a href="#" class="nav-logo">
-    <svg viewBox="0 0 34 34" fill="none">
-      <circle cx="17" cy="17" r="17" fill="url(#g1)"/>
-      <path d="M10 17a7 7 0 0 1 7-7m7 7a7 7 0 0 1-7 7m0-14v14M10 17h14" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
-      <circle cx="17" cy="17" r="2.5" fill="#fff"/>
-      <defs><linearGradient id="g1" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse"><stop stop-color="#00c6ff"/><stop offset="1" stop-color="#0072ff"/></linearGradient></defs>
-    </svg>
+    <img src="images/app_icon.jpg" alt="WirelessConnect Logo" style="width: 32px; height: 32px; border-radius: 8px;" />
     <span>WirelessConnect</span>
   </a>
   <ul class="nav-links">
@@ -183,7 +178,7 @@
     </div>
   </div>
   <div class="hero-screenshot">
-    <img src="assets/app_screenshot.png" alt="WirelessConnect App Screenshot" />
+    <img src="images/app_screenshot.png" alt="WirelessConnect App Screenshot" />
   </div>
 </section>
 
@@ -229,7 +224,7 @@
       </div>
       <div class="steps-image">
         <div class="img-glow"></div>
-        <img src="assets/pairing_step1.png" alt="Pairing Step Screenshot" />
+        <img src="images/pairing_step1.png" alt="Pairing Step Screenshot" />
       </div>
     </div>
   </div>
@@ -241,9 +236,9 @@
     <div class="section-tag">Screenshots</div>
     <h2 class="section-title">A beautiful app<br/>that stays out of your way.</h2>
     <div class="screenshots-grid">
-      <div class="ss-card"><img src="assets/app_screenshot.png" alt="Main Dashboard" /><div class="ss-label">&#128241; Main Dashboard — Device connected &amp; Live Mirror active</div></div>
-      <div class="ss-card"><img src="assets/pairing_step1.png" alt="Pairing Guide" /><div class="ss-label">&#128279; Step-by-step pairing guide — Easy setup wizard</div></div>
-      <div class="ss-card"><img src="assets/pairing_step2.png" alt="Enter credentials" /><div class="ss-label">&#9999;&#65039; Enter credentials — IP, port and 6-digit code</div></div>
+      <div class="ss-card"><img src="images/app_screenshot.png" alt="Main Dashboard" /><div class="ss-label">&#128241; Main Dashboard — Device connected &amp; Live Mirror active</div></div>
+      <div class="ss-card"><img src="images/pairing_step1.png" alt="Pairing Guide" /><div class="ss-label">&#128279; Step-by-step pairing guide — Easy setup wizard</div></div>
+      <div class="ss-card"><img src="images/pairing_step2.png" alt="Enter credentials" /><div class="ss-label">&#9999;&#65039; Enter credentials — IP, port and 6-digit code</div></div>
       <div class="ss-card" style="background:linear-gradient(135deg,rgba(0,198,255,.08),rgba(0,114,255,.12));display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:260px;padding:40px;">
         <div style="font-size:56px;margin-bottom:16px;">&#128640;</div>
         <div style="font-size:18px;font-weight:700;margin-bottom:8px;">More features coming</div>
@@ -326,10 +321,30 @@
       <!-- Issue 2 -->
       <details style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);border-radius:16px;overflow:hidden;">
         <summary style="padding:20px 24px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:12px;list-style:none;">
-          <span style="width:32px;height:32px;border-radius:50%;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.30);display:inline-flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">&#128241;
+          <span style="width:32px;height:32px;border-radius:50%;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.30);display:inline-flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">&#128241;</span>
+          "error: protocol fault (couldn't read status message)"
+        </summary>
+        <div style="padding:0 24px 20px;border-top:1px solid rgba(255,255,255,.08);margin-top:0;">
+          <p style="font-size:14px;color:rgba(255,255,255,.65);line-height:1.7;margin-top:16px;margin-bottom:12px;">This is a generic ADB error on macOS. It happens when the app tries to connect to your phone's IP and Port, but the connection fails or the phone doesn't respond. ADB shows this "protocol fault" instead of a direct Connection Refused error.</p>
+          <div style="background:rgba(41,182,246,.08);border:1px solid rgba(41,182,246,.20);border-radius:10px;padding:14px 16px;">
+            <p style="font-size:13px;font-weight:600;color:#29b6f6;margin-bottom:8px;">&#9989; Fixes:</p>
+            <ol style="font-size:13px;color:rgba(255,255,255,.75);line-height:1.8;padding-left:18px;">
+              <li><strong>Wrong Port (Most Common):</strong> The main Wireless Debugging screen shows an IP and Port. But when you tap "Pair device with pairing code", the popup shows a <strong>different port</strong>! You MUST use the port shown in the popup for pairing.</li>
+              <li><strong>Not on the same Wi-Fi:</strong> Ensure both your Mac and Android phone are on the exact same Wi-Fi network. Some routers have "AP Isolation" or "Guest Network" enabled, which blocks devices from communicating. Try a mobile hotspot to test.</li>
+              <li><strong>macOS Firewall & Local Network Permission:</strong> If your Mac's firewall is on (System Settings > Network > Firewall), try disabling it temporarily. If you are on macOS 15 (Sequoia), ensure the app has Local Network access in System Settings > Privacy & Security > Local Network.</li>
+              <li><strong>Check Network Reachability:</strong> Open your Mac Terminal and type <code>ping [YOUR_PHONE_IP]</code>. If it says "Request timeout", your Mac cannot reach the phone at all.</li>
+            </ol>
+          </div>
+        </div>
+      </details>
+      
+    </div>
+  </div>
+</section>
+
 <footer>
   <div class="footer-brand">
-    <svg width="28" height="28" viewBox="0 0 34 34" fill="none"><circle cx="17" cy="17" r="17" fill="url(#g2)"/><path d="M10 17a7 7 0 0 1 7-7m7 7a7 7 0 0 1-7 7m0-14v14M10 17h14" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="17" r="2.5" fill="#fff"/><defs><linearGradient id="g2" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse"><stop stop-color="#00c6ff"/><stop offset="1" stop-color="#0072ff"/></linearGradient></defs></svg>
+    <img src="images/app_icon.jpg" alt="WirelessConnect Logo" style="width: 28px; height: 28px; border-radius: 6px;" />
     <span>WirelessConnect</span>
   </div>
   <div class="footer-built">Built by <a href="#" target="_blank">Jronix &ndash; Software Solutions</a></div>
