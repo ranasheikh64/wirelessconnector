@@ -1,0 +1,61 @@
+name: Build Release
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            archive_ext: tar.gz
+          - os: windows-latest
+            platform: windows
+            archive_ext: zip
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build pkg-config libgtk-3-dev
+
+      - name: Enable Desktop Support
+        run: flutter config --enable-${{ matrix.platform }}-desktop
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Build Application
+        run: flutter build ${{ matrix.platform }} --release
+
+      - name: Package Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd build/linux/x64/release/bundle
+          tar -czvf ../../../../../WirelessConnect-Linux.tar.gz *
+          
+      - name: Package Windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath WirelessConnect-Windows.zip
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: WirelessConnect-${{ matrix.platform }}
+          path: WirelessConnect-*
