@@ -7,6 +7,7 @@ import '../../core/device_provider.dart';
 import '../../widgets/control_panel/control_panel.dart';
 import '../../widgets/phone_frame/phone_frame_widget.dart';
 import '../../widgets/sidebar/device_sidebar.dart';
+import 'log_console.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -64,6 +65,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
+              // Terminal Log View
+              const SizedBox(
+                height: 150,
+                child: LogConsole(),
+              ),
               // Status bar at bottom
               _buildStatusBar(provider),
             ],
@@ -91,6 +97,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
           ),
           const Spacer(),
+          TextButton.icon(
+            onPressed: () => provider.restartAdbServer(),
+            icon: const Icon(Icons.refresh_rounded, size: 14, color: AppColors.accent),
+            label: const Text('Fix ADB Conflict', style: TextStyle(fontSize: 12, color: AppColors.accent)),
+          ),
+          const SizedBox(width: 8),
           // Device count badge
           if (provider.devices.where((d) => d.isConnected).isNotEmpty)
             Container(

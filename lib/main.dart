@@ -5,6 +5,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'core/app_theme.dart';
 import 'core/device_provider.dart';
+import 'core/logger.dart';
 import 'features/home/home_screen.dart';
 
 Future<void> main() async {
@@ -35,8 +36,11 @@ class WirelessConnectApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => DeviceProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => DeviceProvider()),
+        ChangeNotifierProvider.value(value: AppLogger.instance),
+      ],
       child: MaterialApp(
         title: 'WirelessConnect',
         debugShowCheckedModeBanner: false,

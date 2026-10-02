@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
@@ -7,6 +8,7 @@ import 'package:pasteboard/pasteboard.dart';
 
 import 'adb_service.dart';
 import 'device_model.dart';
+import 'logger.dart';
 
 class DeviceProvider extends ChangeNotifier {
   final AdbService _adb = AdbService();
@@ -53,11 +55,23 @@ class DeviceProvider extends ChangeNotifier {
       // Check if scrcpy is installed
       final scrcpy = await _adb.resolveScrcpy();
       isScrcpyAvailable = scrcpy != null;
-      debugPrint('Scrcpy available: $isScrcpyAvailable (path: $scrcpy)');
+      AppLogger.log('Scrcpy available: $isScrcpyAvailable (path: $scrcpy)');
     }
 
     isCheckingAdb = false;
     notifyListeners();
+  }
+
+  Future<void> restartAdbServer() async {
+    AppLogger.log('Killing all ADB instances (Fix Conflict)...');
+    try {
+      await Process.run('killall', ['adb']);
+    } catch (_) {}
+    try {
+      await _adb.startServer();
+    } catch (_) {}
+    AppLogger.log('ADB server restarted.');
+    await _refreshDevices();
   }
 
   // ─────────────────────────────────────────────────────────
@@ -132,26 +146,32 @@ class DeviceProvider extends ChangeNotifier {
   // Connect / Pair / Disconnect
   // ─────────────────────────────────────────────────────────
 
-  Future<PairResult> pairDevice(String ip, String port, String code) async {
+  Future<(PairResult, String)> pairDevice(String ip, String port, String code) async {
     setStatus('Pairing $ip:$port...');
+    AppLogger.log('Starting pairing process for $ip:$port with code $code...');
     final result = await _adb.pairDevice(ip, port, code);
-    if (result == PairResult.success) {
+    if (result.$1 == PairResult.success) {
       setStatus('Paired! Connecting...');
+      AppLogger.log('Pairing successful for $ip:$port');
     } else {
       setError('Pairing failed. Check code and try again.');
+      AppLogger.log('Pairing failed: ${result.$2}');
     }
     return result;
   }
 
   Future<ConnectResult> connectDevice(String ip, String port) async {
     setStatus('Connecting to $ip:$port...');
+    AppLogger.log('Attempting to connect to $ip:$port...');
     final result = await _adb.connectDevice(ip, port);
     if (result == ConnectResult.success) {
       setStatus('Connected!');
+      AppLogger.log('Successfully connected to $ip:$port');
       await _saveDeviceHistory('$ip:$port');
       await _refreshDevices();
     } else {
       setError('Connection failed. Ensure Wireless Debugging is ON.');
+      AppLogger.log('Connection failed for $ip:$port (Result: $result)');
     }
     return result;
   }
