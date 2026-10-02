@@ -155,10 +155,9 @@ class AdbService {
           '-s', deviceId,
           '--stay-awake',
           '--no-audio',
-          '--video-bit-rate=1M',   // 1M for absolute speed (from Mac tip)
+          '--video-bit-rate=2M',   // 2M is better for H.264
           '--max-size=960',        // 960px max size for Mac
           '--max-fps=60',          // 60fps
-          '--video-codec=h265',    // H.265 (Uses Metal GPU natively)
           '--video-buffer=0',      // Zero video buffering
           '--audio-buffer=0',      // Zero audio buffering
           '--window-title=Wireless Connect Mirror', // Custom window title
@@ -206,7 +205,7 @@ class AdbService {
     }
   }
 
-  Future<PairResult> pairDevice(String ip, String port, String code) async {
+  Future<(PairResult, String)> pairDevice(String ip, String port, String code) async {
     try {
       final exe = await _resolveAdb();
       debugPrint('[ADB] Pairing: $exe pair $ip:$port <code>');
@@ -218,23 +217,23 @@ class AdbService {
       debugPrint('[ADB] pair stderr: $stderr');
       // Success
       if (stdout.contains('successfully paired') || stdout.contains('paired to')) {
-        return PairResult.success;
+        return (PairResult.success, '');
       }
       // Explicit failure keywords in stdout
       if (stdout.contains('failed') || stdout.contains('error') || stdout.contains('refused')) {
-        return PairResult.failed;
+        return (PairResult.failed, 'stdout: ${result.stdout.toString().trim()}');
       }
       // Only treat stderr as error if it has actual error keywords
       // (adb often writes version info / warnings to stderr on success)
       if (stderr.contains('error') || stderr.contains('failed') || stderr.contains('refused')) {
-        return PairResult.failed;
+        return (PairResult.failed, 'stderr: ${result.stderr.toString().trim()}');
       }
-      return PairResult.failed;
+      return (PairResult.failed, 'Unknown error. stdout: $stdout | stderr: $stderr');
     } on TimeoutException {
-      return PairResult.timeout;
+      return (PairResult.timeout, 'Timeout connecting to device');
     } catch (e) {
       debugPrint('[ADB] pair exception: $e');
-      return PairResult.timeout;
+      return (PairResult.timeout, 'Exception: $e');
     }
   }
 
