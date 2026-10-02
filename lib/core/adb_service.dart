@@ -209,17 +209,31 @@ class AdbService {
   Future<PairResult> pairDevice(String ip, String port, String code) async {
     try {
       final exe = await _resolveAdb();
+      debugPrint('[ADB] Pairing: $exe pair $ip:$port <code>');
       final result = await Process.run(exe, ['pair', '$ip:$port', code])
           .timeout(const Duration(seconds: 20));
-      final stdout = result.stdout as String;
-      final stderr = result.stderr as String;
-      if (stdout.contains('Successfully paired') || stdout.contains('paired to')) {
+      final stdout = (result.stdout as String).toLowerCase();
+      final stderr = (result.stderr as String).toLowerCase();
+      debugPrint('[ADB] pair stdout: $stdout');
+      debugPrint('[ADB] pair stderr: $stderr');
+      // Success
+      if (stdout.contains('successfully paired') || stdout.contains('paired to')) {
         return PairResult.success;
-      } else if (stdout.contains('Failed') || stderr.isNotEmpty) {
+      }
+      // Explicit failure keywords in stdout
+      if (stdout.contains('failed') || stdout.contains('error') || stdout.contains('refused')) {
+        return PairResult.failed;
+      }
+      // Only treat stderr as error if it has actual error keywords
+      // (adb often writes version info / warnings to stderr on success)
+      if (stderr.contains('error') || stderr.contains('failed') || stderr.contains('refused')) {
         return PairResult.failed;
       }
       return PairResult.failed;
-    } catch (_) {
+    } on TimeoutException {
+      return PairResult.timeout;
+    } catch (e) {
+      debugPrint('[ADB] pair exception: $e');
       return PairResult.timeout;
     }
   }
