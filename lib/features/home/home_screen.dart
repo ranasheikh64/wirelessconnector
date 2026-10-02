@@ -17,6 +17,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  double _terminalHeight = 150.0;
+
   @override
   void initState() {
     super.initState();
@@ -71,10 +73,36 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              // Terminal Log View
-              const SizedBox(
-                height: 150,
-                child: LogConsole(),
+              // Terminal Log View with Drag Handle
+              GestureDetector(
+                onVerticalDragUpdate: (details) {
+                  setState(() {
+                    _terminalHeight -= details.delta.dy;
+                    if (_terminalHeight < 50) _terminalHeight = 50; // min height
+                    if (_terminalHeight > 600) _terminalHeight = 600; // max height
+                  });
+                },
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.resizeUpDown,
+                  child: Container(
+                    height: 8,
+                    color: Colors.transparent,
+                    child: Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.border,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: _terminalHeight,
+                child: const LogConsole(),
               ),
               // Status bar at bottom
               _buildStatusBar(provider),

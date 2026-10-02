@@ -117,10 +117,19 @@ class AdbService {
   /// Runs adb with the auto-resolved executable path.
   Future<ProcessResult> _run(List<String> args, {bool binaryOutput = false}) async {
     final exe = await _resolveAdb();
-    AppLogger.log('\$ $exe ${args.join(' ')}');
+    
+    // Hide 'devices' spam from terminal log
+    if (args.first != 'devices') {
+      AppLogger.log('\$ $exe ${args.join(' ')}');
+    }
+
+    final env = Map<String, String>.from(Platform.environment);
+    env['ADB_MDNS_OPENSCREEN'] = '1';
+    
     final result = await Process.run(
       exe,
       args,
+      environment: env,
       stdoutEncoding: binaryOutput ? null : systemEncoding,
     ).timeout(_adbTimeout);
     
@@ -165,6 +174,11 @@ class AdbService {
       // CRITICAL: macOS GUI apps don't have ADB in PATH, so scrcpy will crash
       // unless we explicitly tell it where ADB is via the ADB environment var.
       final exe = await _resolveAdb();
+      
+      final env = Map<String, String>.from(Platform.environment);
+      env['ADB'] = exe;
+      env['ADB_MDNS_OPENSCREEN'] = '1';
+
       final process = await Process.start(
         scrcpy, 
         [
@@ -178,9 +192,7 @@ class AdbService {
           '--audio-buffer=0',      // Zero audio buffering
           '--window-title=Wireless Connect Mirror', // Custom window title
         ],
-        environment: {
-          'ADB': exe,
-        },
+        environment: env,
       );
 
       // Log stderr for debugging, but don't block
@@ -227,13 +239,25 @@ class AdbService {
   Future<(PairResult, String)> pairDevice(String ip, String port, String code) async {
     try {
       final exe = await _resolveAdb();
+      final cleanCode = code.trim();
       AppLogger.log('\$ $exe pair $ip:$port <code>');
-      final result = await Process.run(exe, ['pair', '$ip:$port', code])
-          .timeout(const Duration(seconds: 20));
+      
+      final env = Map<String, String>.from(Platform.environment);
+      env['ADB_MDNS_OPENSCREEN'] = '1';
+      
+      final result = await Process.run(
+        exe, 
+        ['pair', '$ip:$port', cleanCode],
+        environment: env,
+      ).timeout(const Duration(seconds: 20));
+      
       final stdout = (result.stdout as String).toLowerCase();
       final stderr = (result.stderr as String).toLowerCase();
+      
       AppLogger.log('[ADB] pair stdout: $stdout');
       if (stderr.isNotEmpty) AppLogger.log('[ADB] pair stderr: $stderr');
+      if (result.exitCode != 0) AppLogger.log('[ADB] pair exitCode: ${result.exitCode}');
+      
       // Success
       if (stdout.contains('successfully paired') || stdout.contains('paired to')) {
         return (PairResult.success, '');
@@ -260,8 +284,15 @@ class AdbService {
   Future<ConnectResult> connectDevice(String ip, String port) async {
     try {
       final exe = await _resolveAdb();
-      final result = await Process.run(exe, ['connect', '$ip:$port'])
-          .timeout(const Duration(seconds: 15));
+      
+      final env = Map<String, String>.from(Platform.environment);
+      env['ADB_MDNS_OPENSCREEN'] = '1';
+      
+      final result = await Process.run(
+        exe, 
+        ['connect', '$ip:$port'],
+        environment: env,
+      ).timeout(const Duration(seconds: 15));
       final stdout = result.stdout as String;
       if (stdout.contains('connected to') || stdout.contains('already connected')) {
         return ConnectResult.success;
