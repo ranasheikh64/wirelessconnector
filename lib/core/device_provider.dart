@@ -194,6 +194,30 @@ class DeviceProvider extends ChangeNotifier {
     await _refreshDevices();
   }
 
+  Future<void> forgetDevice(DeviceInfo device) async {
+    // First disconnect if it's connected
+    if (device.isConnected) {
+      await _adb.disconnectDevice(device.id);
+    }
+    
+    // Remove from UI list
+    devices.removeWhere((d) => d.id == device.id);
+    if (selectedDevice?.id == device.id) {
+      selectedDevice = null;
+      currentScreenshot = null;
+      _stopScreenshotRefresh();
+    }
+    
+    // Remove from preferences
+    final prefs = await SharedPreferences.getInstance();
+    final history = prefs.getStringList('device_history') ?? [];
+    history.remove(device.id);
+    await prefs.setStringList('device_history', history);
+    
+    AppLogger.log('Removed device: ${device.id}');
+    notifyListeners();
+  }
+
   void selectDevice(DeviceInfo device) {
     selectedDevice = device;
     currentScreenshot = null;

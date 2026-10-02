@@ -55,7 +55,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Container(
                         color: AppColors.bg,
                         child: const Center(
-                          child: PhoneFrameWidget(),
+                          child: FittedBox(
+                            fit: BoxFit.contain,
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 20),
+                              child: PhoneFrameWidget(),
+                            ),
+                          ),
                         ),
                       ),
                     ),

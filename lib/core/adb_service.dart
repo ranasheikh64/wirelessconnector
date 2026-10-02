@@ -3,6 +3,8 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 
+import 'logger.dart';
+
 /// ADB Service — wraps all adb command executions.
 ///
 /// Path resolution is fully dynamic — no hardcoded usernames or machine-
@@ -53,6 +55,7 @@ class AdbService {
         final found = (result.stdout as String).trim().split('\n').first.trim();
         if (found.isNotEmpty && await File(found).exists()) {
           _adbPath = found;
+          AppLogger.log('[ADB] Found via shell: $_adbPath');
           return _adbPath!;
         }
       }
@@ -66,6 +69,7 @@ class AdbService {
       final candidate = '$sdkRoot${s}platform-tools${s}adb$ext';
       if (await File(candidate).exists()) {
         _adbPath = candidate;
+        AppLogger.log('[ADB] Found via ANDROID_HOME: $_adbPath');
         return _adbPath!;
       }
     }
@@ -75,10 +79,12 @@ class AdbService {
       if (path.isEmpty) continue;
       if (await File(path).exists()) {
         _adbPath = path;
+        AppLogger.log('[ADB] Found via fallback: $_adbPath');
         return _adbPath!;
       }
     }
 
+    AppLogger.log('[ADB] Could not find absolute path, falling back to "adb"');
     return 'adb';
   }
 
@@ -111,11 +117,17 @@ class AdbService {
   /// Runs adb with the auto-resolved executable path.
   Future<ProcessResult> _run(List<String> args, {bool binaryOutput = false}) async {
     final exe = await _resolveAdb();
-    return Process.run(
+    AppLogger.log('\$ $exe ${args.join(' ')}');
+    final result = await Process.run(
       exe,
       args,
       stdoutEncoding: binaryOutput ? null : systemEncoding,
     ).timeout(_adbTimeout);
+    
+    if (result.exitCode != 0 && !binaryOutput) {
+      AppLogger.log('[ERROR ${result.exitCode}] ${result.stderr}');
+    }
+    return result;
   }
 
   // ─────────────────────────────────────────────
@@ -142,8 +154,12 @@ class AdbService {
   /// Launches scrcpy for true real-time live screen mirroring.
   Future<bool> launchScrcpy(String deviceId) async {
     final scrcpy = await resolveScrcpy();
-    if (scrcpy == null) return false;
+    if (scrcpy == null) {
+      AppLogger.log('[Scrcpy] Executable not found!');
+      return false;
+    }
 
+    AppLogger.log('[Scrcpy] Launching live screen for $deviceId using $scrcpy');
     try {
       // Run scrcpy normally (NOT detached) so it gets a proper window.
       // CRITICAL: macOS GUI apps don't have ADB in PATH, so scrcpy will crash
@@ -169,17 +185,20 @@ class AdbService {
 
       // Log stderr for debugging, but don't block
       process.stderr.transform(const SystemEncoding().decoder).listen(
-        (data) => debugPrint('scrcpy: $data'),
+        (data) {
+          final msg = data.trim();
+          if (msg.isNotEmpty) AppLogger.log('[Scrcpy] $msg');
+        }
       );
 
       // Don't await - let it run in background
       process.exitCode.then(
-        (code) => debugPrint('scrcpy exited: $code'),
+        (code) => AppLogger.log('[Scrcpy] Exited with code $code'),
       );
 
       return true;
     } catch (e) {
-      debugPrint('Failed to launch scrcpy: $e');
+      AppLogger.log('[Scrcpy] Failed to launch: $e');
       return false;
     }
   }
@@ -208,13 +227,13 @@ class AdbService {
   Future<(PairResult, String)> pairDevice(String ip, String port, String code) async {
     try {
       final exe = await _resolveAdb();
-      debugPrint('[ADB] Pairing: $exe pair $ip:$port <code>');
+      AppLogger.log('\$ $exe pair $ip:$port <code>');
       final result = await Process.run(exe, ['pair', '$ip:$port', code])
           .timeout(const Duration(seconds: 20));
       final stdout = (result.stdout as String).toLowerCase();
       final stderr = (result.stderr as String).toLowerCase();
-      debugPrint('[ADB] pair stdout: $stdout');
-      debugPrint('[ADB] pair stderr: $stderr');
+      AppLogger.log('[ADB] pair stdout: $stdout');
+      if (stderr.isNotEmpty) AppLogger.log('[ADB] pair stderr: $stderr');
       // Success
       if (stdout.contains('successfully paired') || stdout.contains('paired to')) {
         return (PairResult.success, '');
@@ -230,9 +249,10 @@ class AdbService {
       }
       return (PairResult.failed, 'Unknown error. stdout: $stdout | stderr: $stderr');
     } on TimeoutException {
+      AppLogger.log('[ADB] pair timeout!');
       return (PairResult.timeout, 'Timeout connecting to device');
     } catch (e) {
-      debugPrint('[ADB] pair exception: $e');
+      AppLogger.log('[ADB] pair exception: $e');
       return (PairResult.timeout, 'Exception: $e');
     }
   }

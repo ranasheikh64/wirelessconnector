@@ -298,6 +298,24 @@ class _DeviceCardState extends State<_DeviceCard> {
                     ],
                   ),
                 ),
+                // Forget/Delete button
+                if (_hovered || !widget.device.isConnected)
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 14),
+                    color: AppColors.textTertiary,
+                    hoverColor: AppColors.error,
+                    splashRadius: 14,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                    tooltip: 'Forget device',
+                    onPressed: () {
+                      provider.forgetDevice(widget.device);
+                    },
+                  ),
+                
+                if (_hovered || !widget.device.isConnected)
+                  const SizedBox(width: 4),
+
                 // Status dot or Reconnect button
                 if (widget.device.isConnected)
                   AnimatedContainer(
@@ -322,7 +340,7 @@ class _DeviceCardState extends State<_DeviceCard> {
                     hoverColor: AppColors.accent,
                     splashRadius: 16,
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                    constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                     tooltip: 'Reconnect',
                     onPressed: () {
                       provider.reconnectDevice(widget.device);
