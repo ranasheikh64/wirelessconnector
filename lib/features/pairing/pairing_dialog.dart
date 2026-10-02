@@ -443,7 +443,7 @@ class _PairingDialogState extends State<PairingDialog> {
 
     if (!mounted) return;
 
-    if (pairResult == PairResult.success) {
+    if (pairResult.$1 == PairResult.success) {
       setState(() {
         _isPairing = false;
         _step = 2;
@@ -464,9 +464,9 @@ class _PairingDialogState extends State<PairingDialog> {
     } else {
       setState(() {
         _isPairing = false;
-        _pairError = pairResult == PairResult.timeout
-            ? 'Timeout. Check IP and port, then try again.'
-            : 'Pairing failed. Check the 6-digit code.';
+        _pairError = pairResult.$1 == PairResult.timeout
+            ? 'Timeout. Check IP and port, then try again.\nLog: ${pairResult.$2}'
+            : 'Pairing failed. Check the 6-digit code.\nLog: ${pairResult.$2}';
       });
     }
   }
