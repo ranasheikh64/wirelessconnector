@@ -337,6 +337,26 @@
           </div>
         </div>
       </details>
+
+      <!-- Issue 3 -->
+      <details style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);border-radius:16px;overflow:hidden;">
+        <summary style="padding:20px 24px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:12px;list-style:none;">
+          <span style="width:32px;height:32px;border-radius:50%;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.30);display:inline-flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">&#128187;</span>
+          PC on Ethernet, Phone on Wi-Fi (Different Networks)
+        </summary>
+        <div style="padding:0 24px 20px;border-top:1px solid rgba(255,255,255,.08);margin-top:0;">
+          <p style="font-size:14px;color:rgba(255,255,255,.65);line-height:1.7;margin-top:16px;margin-bottom:12px;">If your PC is connected via an Ethernet cable and your phone is on Wi-Fi, they can connect <strong>only if they are on the same router (same subnet)</strong>. If they are on different networks, they cannot communicate natively. Here are the best workarounds:</p>
+          <div style="background:rgba(41,182,246,.08);border:1px solid rgba(41,182,246,.20);border-radius:10px;padding:14px 16px;">
+            <p style="font-size:13px;font-weight:600;color:#29b6f6;margin-bottom:8px;">&#9989; Solutions:</p>
+            <ol style="font-size:13px;color:rgba(255,255,255,.75);line-height:1.8;padding-left:18px;">
+              <li><strong>Virtual LAN (Software - Recommended):</strong> Install a free Virtual Private Network tool like <strong>Tailscale</strong> or <strong>ZeroTier</strong> on both your PC and Phone. They will assign a virtual IP to your phone (e.g., <code>100.x.x.x</code>). Enter this virtual IP in WirelessConnect to connect from anywhere!</li>
+              <li><strong>PC Mobile Hotspot (Best Performance):</strong> If your PC has a Wi-Fi card, turn on "Mobile Hotspot" in your PC's network settings. Connect your Android phone directly to the PC's hotspot. This ensures a direct connection with 0ms latency!</li>
+              <li><strong>USB Wi-Fi Adapter (Hardware):</strong> If your desktop PC lacks a Wi-Fi card, you can buy a cheap USB Wi-Fi dongle ($5). Plug it in, enable Mobile Hotspot from the PC, and connect your phone directly.</li>
+              <li><strong>USB Tethering (Temporary Bridge):</strong> Connect your phone to the PC via USB temporarily and turn on "USB Tethering" in your phone's network settings. This creates a direct local network between them. You can then connect via the app using the new tethering IP.</li>
+            </ol>
+          </div>
+        </div>
+      </details>
       
     </div>
   </div>
