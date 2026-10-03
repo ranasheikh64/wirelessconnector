@@ -1,4 +1,9 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 
@@ -25,13 +30,75 @@ class _PairingDialogState extends State<PairingDialog> {
   String? _pairError;
   bool _isPairing = false;
 
+  // mDNS Discovery
+  List<MdnsDevice> _discoveredDevices = [];
+  Timer? _mdnsTimer;
+  bool _isScanning = false;
+
+  // QR Pairing
+  String? _qrServiceName;
+  String? _qrPassword;
+  Timer? _qrTimer;
+
   @override
   void dispose() {
+    _mdnsTimer?.cancel();
+    _qrTimer?.cancel();
     _ipController.dispose();
     _pairPortController.dispose();
     _pairCodeController.dispose();
     _connectPortController.dispose();
     super.dispose();
+  }
+
+  void _startMdnsScan() {
+    _mdnsTimer?.cancel();
+    _scanMdns();
+    _mdnsTimer = Timer.periodic(const Duration(seconds: 3), (_) => _scanMdns());
+  }
+
+  void _startQrScan() {
+    _generateQrData();
+    _qrTimer?.cancel();
+    _qrTimer = Timer.periodic(const Duration(seconds: 2), (_) => _checkQrMdns());
+  }
+
+  void _generateQrData() {
+    final rand = Random();
+    _qrServiceName = 'adb-cli-${rand.nextInt(900000) + 100000}';
+    _qrPassword = '${rand.nextInt(900000) + 100000}';
+  }
+
+  Future<void> _checkQrMdns() async {
+    if (!mounted || _isPairing) return;
+    final provider = context.read<DeviceProvider>();
+    final devices = await provider.adbService.discoverMdnsDevices();
+    for (var d in devices) {
+      if (d.name == _qrServiceName) {
+        _qrTimer?.cancel();
+        // Found it! Initiate pairing automatically
+        setState(() {
+          _ipController.text = d.ip;
+          _pairPortController.text = d.port;
+          _pairCodeController.text = _qrPassword!;
+        });
+        _doPair();
+        break;
+      }
+    }
+  }
+
+  Future<void> _scanMdns() async {
+    if (!mounted || _isScanning) return;
+    _isScanning = true;
+    final provider = context.read<DeviceProvider>();
+    final devices = await provider.adbService.discoverMdnsDevices();
+    if (mounted) {
+      setState(() {
+        _discoveredDevices = devices;
+      });
+    }
+    _isScanning = false;
   }
 
   @override
@@ -104,6 +171,7 @@ class _PairingDialogState extends State<PairingDialog> {
         1 => _buildPairingStep(),
         2 => _buildConnectingStep(),
         3 => _buildSuccessStep(),
+        4 => _buildQrStep(),
         _ => const SizedBox.shrink(),
       },
     );
@@ -149,16 +217,34 @@ class _PairingDialogState extends State<PairingDialog> {
                 child: const Text('Cancel',
                     style: TextStyle(color: AppColors.textSecondary)),
               ),
+              const Spacer(),
+              ElevatedButton.icon(
+                onPressed: () {
+                  setState(() => _step = 4);
+                  _startQrScan();
+                },
+                icon: const Icon(Icons.qr_code, size: 16),
+                label: const Text('QR Code'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.surfaceAlt,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
               const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: () => setState(() => _step = 1),
+                onPressed: () {
+                  setState(() => _step = 1);
+                  _startMdnsScan();
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text('I\'m Ready →'),
+                child: const Text('Pair Manually →'),
               ),
             ],
           ),
@@ -199,6 +285,54 @@ class _PairingDialogState extends State<PairingDialog> {
             ),
           ),
           const SizedBox(height: 16),
+
+          // Auto Discovery
+          if (_discoveredDevices.isNotEmpty) ...[
+            const Text(
+              'Discovered Devices on Wi-Fi',
+              style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 40,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _discoveredDevices.length,
+                itemBuilder: (context, index) {
+                  final d = _discoveredDevices[index];
+                  final isPairing = d.type.contains('pairing');
+                  final icon = isPairing ? Icons.phonelink_setup : Icons.smartphone;
+                  
+                  // Hide ugly ADB mDNS hash names
+                  String displayName = d.name;
+                  if (displayName.startsWith('adb-')) {
+                    displayName = isPairing ? 'Ready to Pair (${d.ip})' : 'Paired Device (${d.ip})';
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ActionChip(
+                      avatar: Icon(icon, size: 16, color: Colors.blueAccent),
+                      label: Text(displayName, style: const TextStyle(fontSize: 12)),
+                      backgroundColor: Colors.blueAccent.withOpacity(0.1),
+                      side: BorderSide(color: Colors.blueAccent.withOpacity(0.4)),
+                      onPressed: () {
+                        setState(() {
+                          _ipController.text = d.ip;
+                          if (isPairing) {
+                            _pairPortController.text = d.port;
+                          } else {
+                            _connectPortController.text = d.port;
+                          }
+                        });
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           Row(
             children: [
@@ -283,6 +417,83 @@ class _PairingDialogState extends State<PairingDialog> {
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white))
                     : const Text('Pair & Connect'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Step 4: QR Code ───────────────────────────────────────────────────
+  Widget _buildQrStep() {
+    if (_qrServiceName == null || _qrPassword == null) {
+      return const SizedBox.shrink();
+    }
+    
+    final payload = 'WIFI:T:ADB;S:$_qrServiceName;P:$_qrPassword;;';
+
+    return Padding(
+      key: const ValueKey(4),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          const Text(
+            'Scan to Connect',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Open "Pair device with QR code" on your phone and scan this code.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 24),
+          
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: QrImageView(
+              data: payload,
+              version: QrVersions.auto,
+              size: 200.0,
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          if (_isPairing) ...[
+            const CircularProgressIndicator(color: AppColors.accent),
+            const SizedBox(height: 10),
+            const Text('Pairing automatically...', style: TextStyle(color: AppColors.textSecondary)),
+          ] else ...[
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
+                ),
+                SizedBox(width: 10),
+                Text('Waiting for scan...', style: TextStyle(color: AppColors.accent)),
+              ],
+            ),
+          ],
+          
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: () {
+                  _qrTimer?.cancel();
+                  setState(() => _step = 0);
+                },
+                child: const Text('← Back', style: TextStyle(color: AppColors.textSecondary)),
               ),
             ],
           ),
@@ -424,12 +635,37 @@ class _PairingDialogState extends State<PairingDialog> {
     final code = _pairCodeController.text.trim();
     final connectPort = _connectPortController.text.trim();
 
+    // 1. Empty checks
     if (ip.isEmpty || pairPort.isEmpty || code.isEmpty) {
-      setState(() => _pairError = 'Please fill in all fields.');
+      setState(() => _pairError = 'IP, Pair Port, and Code are required.');
       return;
     }
-    if (code.length != 6) {
-      setState(() => _pairError = 'Pairing code must be 6 digits.');
+
+    // 2. IP Validation
+    final ipRegex = RegExp(r'^(\d{1,3}\.){3}\d{1,3}$');
+    if (!ipRegex.hasMatch(ip)) {
+      setState(() => _pairError = 'Invalid IP Address format (e.g. 192.168.1.x)');
+      return;
+    }
+
+    // 3. Port Validations
+    final pPort = int.tryParse(pairPort);
+    if (pPort == null || pPort <= 0 || pPort > 65535) {
+      setState(() => _pairError = 'Pair Port must be a valid number (1-65535)');
+      return;
+    }
+
+    if (connectPort.isNotEmpty) {
+      final cPort = int.tryParse(connectPort);
+      if (cPort == null || cPort <= 0 || cPort > 65535) {
+        setState(() => _pairError = 'Debug Port must be a valid number (1-65535)');
+        return;
+      }
+    }
+
+    // 4. Code Validation
+    if (code.length != 6 || int.tryParse(code) == null) {
+      setState(() => _pairError = 'Pairing code must be exactly 6 digits.');
       return;
     }
 
@@ -439,6 +675,8 @@ class _PairingDialogState extends State<PairingDialog> {
     });
 
     final provider = context.read<DeviceProvider>();
+    
+    // Attempt Pairing
     final pairResult = await provider.pairDevice(ip, pairPort, code);
 
     if (!mounted) return;
@@ -449,7 +687,49 @@ class _PairingDialogState extends State<PairingDialog> {
         _step = 2;
       });
 
-      final connectResult = await provider.connectDevice(ip, connectPort);
+      // Attempt Connection
+      // 1. Wait a moment because ADB often auto-connects via mDNS after pairing
+      await Future.delayed(const Duration(seconds: 2));
+      
+      // 2. Check if it's already connected automatically
+      final currentDevices = await provider.adbService.listDeviceIds();
+      final mdns = await provider.adbService.discoverMdnsDevices();
+      
+      bool isAutoConnected = false;
+      for (final deviceId in currentDevices) {
+        // Direct IP match
+        if (deviceId.contains(ip)) {
+           isAutoConnected = true;
+           break;
+        }
+        // mDNS name match
+        for (var d in mdns) {
+           if (d.ip == ip && deviceId.contains(d.name)) {
+             isAutoConnected = true;
+             break;
+           }
+        }
+        if (isAutoConnected) break;
+      }
+
+      if (isAutoConnected) {
+         if (mounted) setState(() => _step = 3);
+         return;
+      }
+      
+      // 3. If not auto-connected, try to find the actual connect port via mDNS
+      String? actualConnectPort;
+      for (var d in mdns) {
+        if (d.ip == ip && d.type.contains('connect')) {
+          actualConnectPort = d.port;
+          break;
+        }
+      }
+
+      // 4. Fallback to user input or default 5555
+      final cPort = actualConnectPort ?? (connectPort.isNotEmpty && connectPort != '5555' ? connectPort : '5555');
+      final connectResult = await provider.connectDevice(ip, cPort);
+      
       if (!mounted) return;
 
       if (connectResult == ConnectResult.success) {
@@ -458,7 +738,7 @@ class _PairingDialogState extends State<PairingDialog> {
         setState(() {
           _step = 1;
           _pairError =
-              'Paired but connection failed. Ensure Debug port is correct.';
+              'Paired successfully! But connection failed. Could not find device connect port.';
         });
       }
     } else {

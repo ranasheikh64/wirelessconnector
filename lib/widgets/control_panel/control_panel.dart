@@ -1,12 +1,16 @@
-
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/device_provider.dart';
+import '../../core/logger.dart';
 
 /// Right-side info & control panel
+import '../../features/file_manager/file_manager_view.dart';
+
 class ControlPanel extends StatefulWidget {
   const ControlPanel({super.key});
 
@@ -16,6 +20,40 @@ class ControlPanel extends StatefulWidget {
 
 class _ControlPanelState extends State<ControlPanel> {
   final _textController = TextEditingController();
+
+  String get _scrcpyInstallCmd {
+    if (Platform.isMacOS) return 'brew install scrcpy android-platform-tools';
+    if (Platform.isWindows) return 'scoop install scrcpy';
+    return 'sudo apt install scrcpy adb';
+  }
+
+  bool _isInstallingScrcpy = false;
+
+  Future<void> _installScrcpy() async {
+    setState(() => _isInstallingScrcpy = true);
+    AppLogger.log('\$ $_scrcpyInstallCmd');
+    
+    try {
+      final parts = _scrcpyInstallCmd.split(' ');
+      final cmd = parts.first;
+      final args = parts.sublist(1);
+      
+      final process = await Process.start(cmd, args);
+      process.stdout.transform(utf8.decoder).listen((data) {
+        AppLogger.log(data.trim());
+      });
+      process.stderr.transform(utf8.decoder).listen((data) {
+        AppLogger.log(data.trim());
+      });
+      
+      final exitCode = await process.exitCode;
+      AppLogger.log('Install completed with exit code $exitCode. Please restart the app to apply changes.');
+    } catch (e) {
+      AppLogger.log('Install failed: $e');
+    } finally {
+      if (mounted) setState(() => _isInstallingScrcpy = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -183,36 +221,43 @@ class _ControlPanelState extends State<ControlPanel> {
                     )
                   : Column(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppColors.bg,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.terminal_rounded,
-                                  size: 13,
-                                  color: AppColors.textTertiary),
-                              SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  'brew install scrcpy',
-                                  style: TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontSize: 11,
-                                    color: AppColors.accent,
+                        InkWell(
+                          onTap: _isInstallingScrcpy ? null : _installScrcpy,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.bg,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Row(
+                              children: [
+                                _isInstallingScrcpy 
+                                  ? const SizedBox(
+                                      width: 13, height: 13, 
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)
+                                    )
+                                  : const Icon(Icons.terminal_rounded, size: 13, color: AppColors.textTertiary),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    _scrcpyInstallCmd,
+                                    style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 11,
+                                      color: AppColors.accent,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Text(
-                          'Install scrcpy for 60fps live preview',
-                          style: const TextStyle(
+                        const Text(
+                          'Click to install scrcpy for 60fps live preview',
+                          style: TextStyle(
                             color: AppColors.textTertiary,
                             fontSize: 10,
                           ),
@@ -223,6 +268,42 @@ class _ControlPanelState extends State<ControlPanel> {
             ],
           ),
 
+
+          const SizedBox(height: 14),
+
+          // ── File Manager ─────────────────────────
+          _sectionLabel(context, 'Device Storage'),
+          const SizedBox(height: 8),
+          _InfoCard(
+            children: [
+              _ActionButton(
+                icon: Icons.folder_open_rounded,
+                label: 'Open File Manager',
+                color: Colors.blueAccent,
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => Dialog(
+                      backgroundColor: const Color(0xFF1E1E1E),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: SizedBox(
+                        width: 800,
+                        height: 600,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: FileManagerView(
+                            deviceId: device.id,
+                            adbService: provider.adbService,
+                            onClose: () => Navigator.pop(context),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
 
           const SizedBox(height: 20),
           const Divider(),

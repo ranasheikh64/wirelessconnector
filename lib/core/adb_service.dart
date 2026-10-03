@@ -236,6 +236,36 @@ class AdbService {
     }
   }
 
+  Future<List<MdnsDevice>> discoverMdnsDevices() async {
+    try {
+      final result = await _run(['mdns', 'services']);
+      final lines = (result.stdout as String).split('\n');
+      final devices = <MdnsDevice>[];
+      
+      for (var line in lines) {
+        line = line.trim();
+        if (line.isEmpty || line.startsWith('List of')) continue;
+        
+        final parts = line.split(RegExp(r'\s+'));
+        if (parts.length >= 3) {
+          String ipPort = parts.last;
+          String type = parts[parts.length - 2];
+          String name = parts.sublist(0, parts.length - 2).join(' ');
+          
+          if (!ipPort.contains(':')) continue;
+          
+          final ip = ipPort.split(':')[0];
+          final port = ipPort.split(':')[1];
+          
+          devices.add(MdnsDevice(name: name, type: type, ip: ip, port: port));
+        }
+      }
+      return devices;
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<(PairResult, String)> pairDevice(String ip, String port, String code) async {
     try {
       final exe = await _resolveAdb();
@@ -436,6 +466,181 @@ class AdbService {
         .replaceAll(';', '\\;')
         .replaceAll('`', '\\`');
   }
+
+  // ─────────────────────────────────────────────
+  // File Management (Transfer)
+  // ─────────────────────────────────────────────
+
+  Future<List<AdbFile>> listFiles(String deviceId, String path) async {
+    try {
+      // Use standard ls -lA to list files, format: "-rw-rw---- 1 u0_a163 ext_data_rw 45318 2023-10-10 12:00:00 filename"
+      // Wait, let's use `stat` which is much easier to parse: stat -c "%F|%s|%Y|%n"
+      // Some old versions of Android don't support `stat -c`, so we fallback to a simpler ls -1A
+      
+      final result = await _run(['-s', deviceId, 'shell', 'stat', '-c', '"%F|%s|%Y|%n"', '$path/*']);
+      if (result.exitCode != 0) {
+        // Fallback to ls -lA if stat fails or path is empty
+        return await _fallbackListFiles(deviceId, path);
+      }
+
+      final lines = (result.stdout as String).split('\n');
+      final files = <AdbFile>[];
+
+      for (var line in lines) {
+        line = line.trim().replaceAll('"', '');
+        if (line.isEmpty || line.contains('No such file') || line.contains('stat:')) continue;
+
+        final parts = line.split('|');
+        if (parts.length >= 4) {
+          final isDir = parts[0].toLowerCase().contains('directory');
+          final size = int.tryParse(parts[1]) ?? 0;
+          final time = int.tryParse(parts[2]) ?? 0;
+          final fullPath = parts.sublist(3).join('|');
+          final name = fullPath.split('/').last;
+
+          if (name == '.' || name == '..') continue;
+
+          files.add(AdbFile(
+            name: name,
+            path: fullPath,
+            isDirectory: isDir,
+            size: size,
+            modifiedAt: DateTime.fromMillisecondsSinceEpoch(time * 1000),
+          ));
+        }
+      }
+      
+      // Sort: Directories first, then alphabetical
+      files.sort((a, b) {
+        if (a.isDirectory && !b.isDirectory) return -1;
+        if (!a.isDirectory && b.isDirectory) return 1;
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+      
+      return files;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<AdbFile>> _fallbackListFiles(String deviceId, String path) async {
+    try {
+      // Using ls -lA
+      final result = await _run(['-s', deviceId, 'shell', 'ls', '-lA', path]);
+      if (result.exitCode != 0) return [];
+      
+      final lines = (result.stdout as String).split('\n');
+      final files = <AdbFile>[];
+
+      for (var line in lines) {
+        line = line.trim();
+        if (line.isEmpty || line.startsWith('total ')) continue;
+        
+        // drwxrwx--- 2 root ext_data_rw 4096 2023-10-10 12:00 my folder
+        // lrwxrwxrwx 1 root root 11 1970-01-01 00:00 sdcard -> /storage/emulated/0
+        final parts = line.split(RegExp(r'\s+'));
+        if (parts.length >= 7) {
+          final isDir = parts[0].startsWith('d') || parts[0].startsWith('l');
+          
+          // Parse name (handle spaces)
+          int nameIndex = 5;
+          if (parts[5].contains(':')) {
+            nameIndex = 6; // old format without year
+          }
+          if (parts.length > 7 && parts[6].contains(':')) {
+            nameIndex = 7;
+          }
+          
+          if (nameIndex >= parts.length) continue;
+          
+          String name = parts.sublist(nameIndex).join(' ');
+          if (name.contains(' -> ')) {
+            name = name.split(' -> ').first; // handle symlinks
+          }
+          
+          if (name == '.' || name == '..') continue;
+
+          files.add(AdbFile(
+            name: name,
+            path: '$path/$name'.replaceAll('//', '/'),
+            isDirectory: isDir,
+            size: int.tryParse(parts[4]) ?? 0,
+            modifiedAt: DateTime.now(), // Fallback parsing date is tricky
+          ));
+        }
+      }
+      
+      files.sort((a, b) {
+        if (a.isDirectory && !b.isDirectory) return -1;
+        if (!a.isDirectory && b.isDirectory) return 1;
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+      
+      return files;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<bool> pullFile(String deviceId, String remotePath, String localPath) async {
+    try {
+      AppLogger.log('[ADB] Pulling file: $remotePath -> $localPath');
+      final result = await _run(['-s', deviceId, 'pull', remotePath, localPath]);
+      return result.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> pushFile(String deviceId, String localPath, String remotePath) async {
+    try {
+      AppLogger.log('[ADB] Pushing file: $localPath -> $remotePath');
+      final result = await _run(['-s', deviceId, 'push', localPath, remotePath]);
+      return result.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteFile(String deviceId, String remotePath) async {
+    try {
+      AppLogger.log('[ADB] Deleting file: $remotePath');
+      final result = await _run(['-s', deviceId, 'shell', 'rm', '-rf', remotePath]);
+      return result.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
+  }
+}
+
+class AdbFile {
+  final String name;
+  final String path;
+  final bool isDirectory;
+  final int size;
+  final DateTime modifiedAt;
+
+  AdbFile({
+    required this.name,
+    required this.path,
+    required this.isDirectory,
+    required this.size,
+    required this.modifiedAt,
+  });
+}
+
+class MdnsDevice {
+  final String name;
+  final String type;
+  final String ip;
+  final String port;
+
+  MdnsDevice({
+    required this.name,
+    required this.type,
+    required this.ip,
+    required this.port,
+  });
 }
 
 enum PairResult { success, failed, timeout }
