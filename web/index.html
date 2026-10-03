@@ -122,6 +122,11 @@
     .dl-btn:hover { opacity:.88; transform:translateY(-2px); }
     .dl-badge { margin-top:14px; font-size:11px; color:var(--text-muted); }
     .dl-badge a { color:var(--accent); text-decoration:none; }
+    .install-cmd-box { display:flex; align-items:center; justify-content:space-between; background:rgba(0,0,0,.35); border:1px solid rgba(0,198,255,.25); border-radius:10px; padding:10px 14px; cursor:pointer; gap:8px; transition:border-color .2s,background .2s; }
+    .install-cmd-box:hover { border-color:rgba(0,198,255,.6); background:rgba(0,0,0,.5); }
+    .cmd-text { font-family:'Courier New',monospace; font-size:10.5px; color:var(--accent); word-break:break-all; flex:1; }
+    .cmd-copy { font-size:11px; font-weight:600; color:rgba(255,255,255,.6); white-space:nowrap; background:rgba(255,255,255,.1); padding:3px 10px; border-radius:6px; transition:background .2s,color .2s; }
+    .install-cmd-box:hover .cmd-copy { background:rgba(0,198,255,.25); color:#fff; }
     .gh-box { margin-top:60px; padding:40px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:24px; display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap; }
     .gh-link { display:inline-flex; align-items:center; gap:10px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; padding:14px 28px; border-radius:100px; font-size:15px; font-weight:600; text-decoration:none; transition:background .2s; }
     .gh-link:hover { background:rgba(255,255,255,.18); }
@@ -291,8 +296,13 @@
         <div class="dl-icon">&#63743;</div>
         <div class="dl-title">macOS</div>
         <div class="dl-sub">macOS 12 Monterey or later<br/>Apple Silicon &amp; Intel supported</div>
-        <a href="https://github.com/ranasheikh64/wirelessconnector/releases/download/v1.0.0/WirelessConnect_Mac.dmg" class="dl-btn">&#11015; Download for Mac</a>
-        <div class="dl-badge">Requires adb &amp; scrcpy &middot; <a href="https://github.com/ranasheikh64/wirelessconnector#macos">Install guide &rarr;</a></div>
+        <a href="https://github.com/ranasheikh64/wirelessconnector/releases/download/v1.0.0/WirelessConnect_Mac.dmg" class="dl-btn">&#11015; Download DMG</a>
+        <div style="margin:12px 0 6px;font-size:11px;color:rgba(255,255,255,0.45);text-align:center;letter-spacing:1px;text-transform:uppercase;">— or install via Terminal —</div>
+        <div class="install-cmd-box" onclick="copyInstallCmd(this)">
+          <span class="cmd-text">curl -sL https://raw.githubusercontent.com/ranasheikh64/wirelessconnector/main/install.sh | bash</span>
+          <span class="cmd-copy" id="copy-label">Copy</span>
+        </div>
+        <div class="dl-badge" style="margin-top:8px;">No quarantine issues · One command installs everything</div>
       </div>
       <div class="download-card">
         <div class="dl-icon">&#129695;</div>
@@ -410,5 +420,23 @@
   <div class="footer-copy">&copy; 2025 WirelessConnect. All rights reserved.</div>
 </footer>
 
+<script>
+  function copyInstallCmd(el) {
+    const text = el.querySelector('.cmd-text').innerText;
+    const label = el.querySelector('.cmd-copy');
+    
+    navigator.clipboard.writeText(text).then(() => {
+      label.innerText = 'Copied!';
+      label.style.background = '#30D158';
+      label.style.color = '#fff';
+      
+      setTimeout(() => {
+        label.innerText = 'Copy';
+        label.style.background = '';
+        label.style.color = '';
+      }, 2000);
+    });
+  }
+</script>
 </body>
 </html>
